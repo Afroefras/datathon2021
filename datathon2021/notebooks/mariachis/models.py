@@ -1,8 +1,26 @@
 from pathlib import Path
+from geopandas import sjoin
 from pandas import read_csv, DataFrame
-from mariachis.utils import date_vars, create_polygon, make_clusters
+from mariachis.utils import date_vars, create_polygon, make_clusters, clean_text
 
-class Bbva:
+class BaseClass:
+    def __init__(self, base_dir:str, folder_name:str, file_name:str, cp_file:str) -> None:
+        self.base_dir = Path(base_dir)
+        self.file_name = file_name
+        self.file_path = self.base_dir.joinpath(folder_name,file_name)
+        self.cp_path = self.base_dir.joinpath(cp_file)
+
+    def __str__(self) -> str:
+        return f'File: {self.file_path}'
+
+    def export_result(self, df, export_name=None):
+        if export_name==None: export_name=f'Finished_{self.file_name}'
+        df.to_csv(self.base_dir.joinpath(export_name), index=False)
+        print(f'Exported succesfully!\nFile:\t{export_name}\nPath:\t{self.base_dir}')
+
+###############################################################################################################
+
+class Bbva(BaseClass):
     def __init__(self, base_dir:str, cp_file:str, folder_name:str) -> None:
         self.base_dir = Path(base_dir)
         self.cp_filepath = self.base_dir.joinpath(cp_file)
@@ -36,7 +54,7 @@ class Bbva:
         df = df.merge(cat[[zipcode_col]+comunity_cols])
         return df
 
-    def full_pipeline(self, comunity_level=False, date_col='day', omit_zero=['avg_amount','cards'], merge_zipcode=False, cluster_kwargs={}, polygon_kwargs={}, **pivot_kwargs) -> DataFrame:
+    def full_pipeline_bbva(self, comunity_level=False, date_col='day', omit_zero=['avg_amount','cards'], merge_zipcode=False, cluster_kwargs={}, polygon_kwargs={}, **pivot_kwargs) -> DataFrame:
         zipcode = create_polygon(self.cp_filepath, **polygon_kwargs)
         df = self.merge_bbva()
         for col in omit_zero: df = df[df[col]!=0].copy()
@@ -50,31 +68,49 @@ class Bbva:
         else: result = df.reset_index()
         return result, pipe_obj
 
-    def export_bbva(self, df, export_name='Finished_BBVA.csv'):
-        df.to_csv(self.base_dir.joinpath(export_name), index=False)
-        print(f'Exported succesfully!\nFile:\t{export_name}\nPath:\t{self.base_dir}')
+###############################################################################################################
 
-
-from geopandas import sjoin
-
-class Recursos:
-    def __init__(self, base_dir, folder_name, file_name, cp_file) -> None:
-        self.base_dir = Path(base_dir)
-        self.file_path = self.base_dir.joinpath(folder_name,file_name)
-        self.cp_path = self.base_dir.joinpath(cp_file)
+class Recursos(BaseClass):
+    def __init__(self, base_dir:str, folder_name:str, file_name:str, cp_file:str) -> None:
+        super().__init__(base_dir, folder_name, file_name, cp_file)
 
     def __str__(self) -> str:
-        return f'File: {self.file_path}'
+        return super().__str__()
 
-    def intersect_polygon(self, dissolve_by='zipcode', id_col='nombre') -> DataFrame:
+    def intersect_polygon_recursos(self, dissolve_by='zipcode', id_col='nombre') -> DataFrame:
         pol = create_polygon(self.cp_path, dissolve_by=dissolve_by)
         df = create_polygon(self.file_path, lat_col='latitud', lng_col='longitud', just_geodf=True)
         result = sjoin(df, pol, how="inner", op='intersects').drop_duplicates([id_col,'latitud','longitud']).reset_index(drop=True)
         return result
 
-    def full_pipeline(self, group_col=['comunity_code','comunity','place'], type_col='tipo', **intersect_kwargs) -> DataFrame:
-        df = self.intersect_polygon(**intersect_kwargs)
+    def full_pipeline_recursos(self, group_col=['comunity_code','comunity','place'], type_col='tipo', **intersect_kwargs) -> DataFrame:
+        df = self.intersect_polygon_recursos(**intersect_kwargs)
         df['n'] = 1
         df = df.pivot_table(index=group_col, columns=type_col, aggfunc={'n':'sum'}, fill_value=0)
         df.columns = [x[-1] for x in df.columns]
         return df.reset_index()
+
+###############################################################################################################
+
+class Pubs(BaseClass):
+    def __init__(self, base_dir:str, folder_name:str, file_name:str, cp_file:str) -> None:
+        super().__init__(base_dir, folder_name, file_name, cp_file)
+
+    def __str__(self) -> str:
+        return super().__str__()
+
+    def merge_cp_pubs(self, left_on='Municipio', right_on='comunity', value_col='Valor') -> DataFrame:
+        cat = read_csv(self.cp_path)
+        df = read_csv(self.file_path)
+        df[f'clean_{left_on}'] = df[left_on].map(lambda x: clean_text(x, lower=True, rem_stopw=True))
+        cat[f'clean_{right_on}'] = cat[right_on].map(lambda x: clean_text(x, lower=True, rem_stopw=True))
+        df = df.merge(cat, left_on=f'clean_{left_on}', right_on=f'clean_{right_on}').dropna(subset=[value_col])
+        return df
+
+    def full_pipeline_pubs(self, cluster_kwargs={}, **pivot_kwargs) -> DataFrame:
+        df = self.merge_cp_pubs()
+        df = df.pivot_table(**pivot_kwargs)
+        df.columns = ['_'.join(str(y) for y in x) for x in df.columns]
+        df = df[sorted(df.columns)].copy()
+        df['cluster'], pipe_obj = make_clusters(df, df.columns, **cluster_kwargs)
+        return df.reset_index(), pipe_obj

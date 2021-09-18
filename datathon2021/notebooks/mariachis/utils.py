@@ -9,6 +9,8 @@ def date_vars(df, date_col:str) -> DataFrame:
     df[f'{date_col}_yearmonth'] = df[f'{date_col}_year']+' - '+df[f'{date_col}_month']
     return df
 
+###############################################################################################################
+
 from pandas import read_csv
 from geopandas import GeoDataFrame, points_from_xy
 
@@ -20,6 +22,8 @@ def create_polygon(filepath, dissolve_by=None, crs_code="EPSG:3395", lat_col='la
         df['geometry'] = df['geometry'].buffer(0.05)
         df.reset_index(inplace=True)
         return df
+
+###############################################################################################################
 
 from string import ascii_uppercase
 from sklearn.cluster import KMeans
@@ -45,3 +49,20 @@ def profiles(df, cluster_col='cluster'):
     for col in cat_cols:
         prof[col] = df.pivot_table(index=col, columns=cluster_col, aggfunc={'n':sum})
     return prof
+
+###############################################################################################################
+
+from emoji import demojize
+from re import sub, UNICODE
+from unicodedata import normalize
+from nltk.corpus import stopwords
+
+def clean_text(text, language='spanish', pattern="[^a-zA-Z0-9\s]", add_stopw=[],
+                lower=False, rem_stopw=False, unique=False, emoji=False):
+    if emoji: text = demojize(text)
+    cleaned_text = normalize('NFD',str(text).replace('\n',' \n ')).encode('ascii', 'ignore')
+    cleaned_text = sub(pattern,' ',cleaned_text.decode('utf-8'),flags=UNICODE)
+    cleaned_text = [word for word in (cleaned_text.lower().split() if lower else cleaned_text.split())]
+    if rem_stopw: cleaned_text = [word for word in cleaned_text if word not in 
+                                  stopwords.words(language)+add_stopw]
+    return ' '.join((set(cleaned_text) if unique else cleaned_text))
