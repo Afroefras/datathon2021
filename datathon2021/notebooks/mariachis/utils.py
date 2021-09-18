@@ -1,4 +1,3 @@
-from string import ascii_uppercase
 from pandas import DataFrame, to_datetime
 
 def date_vars(df, date_col:str) -> DataFrame:
@@ -10,6 +9,19 @@ def date_vars(df, date_col:str) -> DataFrame:
     df[f'{date_col}_yearmonth'] = df[f'{date_col}_year']+' - '+df[f'{date_col}_month']
     return df
 
+from pandas import read_csv
+from geopandas import GeoDataFrame, points_from_xy
+
+def create_polygon(filepath, dissolve_by=None, crs_code="EPSG:3395", lat_col='lat', lng_col='lng', just_geodf=False) -> DataFrame:
+        df = read_csv(filepath)
+        gdf = GeoDataFrame(df, crs=crs_code, geometry=points_from_xy(df[lat_col], df[lng_col]))
+        if just_geodf: return gdf
+        df = gdf.dissolve(by=dissolve_by)
+        df['geometry'] = df['geometry'].buffer(0.05)
+        df.reset_index(inplace=True)
+        return df
+
+from string import ascii_uppercase
 from sklearn.cluster import KMeans
 from sklearn.pipeline import Pipeline
 from sklearn.mixture import GaussianMixture
