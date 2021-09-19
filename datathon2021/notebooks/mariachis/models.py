@@ -195,7 +195,7 @@ class GroupProfiles(BaseClass):
         df = df.reset_index().pivot_table(index=[pivot_kwargs['index']]+['cluster_agg'], aggfunc='sum')
         return df
 
-    def full_pipeline(self, cluster_kwargs={}, **pivot_kwargs) -> DataFrame:
+    def full_pipeline(self, kbest=22, cluster_kwargs={}, **pivot_kwargs) -> DataFrame:
         df = self.group_profiles(**pivot_kwargs)
         # pipe_obj = Pipeline(steps=[
         #     ('pre_scaler', MinMaxScaler()), 
@@ -212,7 +212,7 @@ class GroupProfiles(BaseClass):
 
         scaler = MinMaxScaler()
         var_th = VarianceThreshold(0.01)
-        k_best = SelectKBest(k='all')
+        k_best = SelectKBest(k=kbest)
 
         cols = [col for col in df.columns if col not in ['cluster']]
         var_th.fit(scaler.fit_transform(df[cols]))
