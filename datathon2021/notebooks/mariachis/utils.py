@@ -71,7 +71,8 @@ def clean_text(text:str, language='spanish', pattern="[^a-zA-Z0-9\s]", add_stopw
 ###############################################################################################################
 
 from sklearn.tree import _tree
-from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from sklearn.tree import DecisionTreeClassifier
+
 def tree_to_code(df, feature_names):
     tree = DecisionTreeClassifier()
     tree.fit(df.drop('cluster', axis = 1), y = df["cluster"])
