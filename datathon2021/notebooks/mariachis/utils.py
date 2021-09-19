@@ -67,3 +67,31 @@ def clean_text(text:str, language='spanish', pattern="[^a-zA-Z0-9\s]", add_stopw
     if rem_stopw: cleaned_text = [word for word in cleaned_text if word not in 
                                   stopwords.words(language)+add_stopw]
     return ' '.join((set(cleaned_text) if unique else cleaned_text))
+
+###############################################################################################################
+
+from sklearn.tree import _tree
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+def tree_to_code(df, feature_names):
+    tree = DecisionTreeClassifier()
+    tree.fit(df.drop('cluster', axis = 1), y = df["cluster"])
+    print(tree.score(df.drop('cluster', axis = 1), y = df["cluster"]))
+    tree_ = tree.tree_
+    feature_name = [
+        feature_names[i] if i != _tree.TREE_UNDEFINED else "undefined!"
+        for i in tree_.feature
+    ]
+    features = ','.join(feature_names)
+    #print(f"def tree({features}):")
+    def recurse(node, depth):
+        indent = "  " * depth
+        if tree_.feature[node] != _tree.TREE_UNDEFINED:
+            name = feature_name[node]
+            threshold = tree_.threshold[node]
+            print(f"{indent}if {name} <= {threshold}:")
+            recurse(tree_.children_left[node], depth + 1)
+            print(f"{indent}else:  # if {name} > {threshold}")
+            recurse(tree_.children_right[node], depth + 1)
+        else:
+            print(f"{indent}return {tree_.value[node]}".format(indent, tree_.value[node]))
+    recurse(0, 1)

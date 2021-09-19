@@ -5,6 +5,8 @@ from pandas import read_csv, DataFrame
 from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import VarianceThreshold
 from mariachis.utils import date_vars, create_polygon, make_clusters, clean_text
 
 class BaseClass:
@@ -188,18 +190,34 @@ class GroupProfiles(BaseClass):
         for file_path in self.all_files:
             sub_df = read_csv(file_path)
             df = df.append(sub_df, ignore_index=True)
+        df[pivot_kwargs['index']] = df[pivot_kwargs['index']].astype(int)
         df = df.pivot_table(**pivot_kwargs).join(df.set_index(pivot_kwargs['index']), lsuffix='_agg')
         df = df.reset_index().pivot_table(index=[pivot_kwargs['index']]+['cluster_agg'], aggfunc='sum')
         return df
 
     def full_pipeline(self, cluster_kwargs={}, **pivot_kwargs) -> DataFrame:
         df = self.group_profiles(**pivot_kwargs)
-        pipe_obj = Pipeline(steps=[
-            ('pre_scaler', MinMaxScaler()), 
-            ('cluster', PCA(3)),
-            ('pos_scaler', MinMaxScaler()),
-        ])
-        X = pipe_obj.fit_transform(df)
-        df = df.iloc[:,:0].join(DataFrame(X, index=df.index))
+        # pipe_obj = Pipeline(steps=[
+        #     ('pre_scaler', MinMaxScaler()), 
+        #     ('cluster', PCA(3)),
+        #     ('pos_scaler', MinMaxScaler()),
+        # ])
+        # X = pipe_obj.fit_transform(df)
+        # df = df.iloc[:,:0].join(DataFrame(X, index=df.index))
         df['cluster'], _ = make_clusters(df, df.columns, **cluster_kwargs)
-        return df, pipe_obj
+
+        omit_months = df.head(1).filter(regex='_[12345689]+').columns.tolist()
+        omit_months = []
+        df = df[[x for x in df.columns if x not in omit_months]].copy()
+
+        scaler = MinMaxScaler()
+        var_th = VarianceThreshold(0.01)
+        k_best = SelectKBest(k='all')
+
+        cols = [col for col in df.columns if col not in ['cluster']]
+        var_th.fit(scaler.fit_transform(df[cols]))
+        df = df.iloc[:,var_th.get_support(indices=True)].join(df['cluster'])
+        cols = [col for col in df.columns if col not in ['cluster']]
+        k_best.fit(df[cols], df['cluster'])
+        df = df.iloc[:,k_best.get_support(indices=True)].join(df['cluster'])
+        return df, (scaler, k_best, var_th)
