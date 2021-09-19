@@ -67,18 +67,3 @@ def clean_text(text:str, language='spanish', pattern="[^a-zA-Z0-9\s]", add_stopw
     if rem_stopw: cleaned_text = [word for word in cleaned_text if word not in 
                                   stopwords.words(language)+add_stopw]
     return ' '.join((set(cleaned_text) if unique else cleaned_text))
-
-###############################################################################################################
-
-from pathlib import Path
-
-def group_profiles(base_dir, folder_name, **pivot_kwargs):
-    base_dir = Path(base_dir)
-    df = DataFrame()
-    for file_path in base_dir.joinpath(folder_name).glob('*.csv'):
-        try: sub_df = read_csv(file_path)
-        except: sub_df = read_csv(file_path, sep='\t', encoding='utf-16')
-        df = df.append(sub_df, ignore_index=True)
-    df = df.pivot_table(**pivot_kwargs)
-    df.to_csv(base_dir.joinpath('grouped.csv'))
-    return df

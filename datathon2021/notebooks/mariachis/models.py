@@ -2,6 +2,9 @@ from re import findall
 from pathlib import Path
 from geopandas import sjoin
 from pandas import read_csv, DataFrame
+from sklearn.pipeline import Pipeline
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import MinMaxScaler
 from mariachis.utils import date_vars, create_polygon, make_clusters, clean_text
 
 class BaseClass:
@@ -164,4 +167,40 @@ class Weather(BaseClass):
         df = df[sorted(df.columns)].copy()
         df['cluster'], pipe_obj = make_clusters(df, df.columns, **cluster_kwargs)
         df.reset_index(inplace=True)
+        return df, pipe_obj
+
+###############################################################################################################
+
+class GroupProfiles:
+    def __init__(self, base_dir, folder_name) -> None:
+        self.base_dir = Path(base_dir)
+        self.folder_name = self.base_dir.joinpath(folder_name)
+        self.all_files = list(self.folder_name.glob('*.csv'))
+
+    def __len__(self):
+        return len(self.all_files)
+
+    def __str__(self) -> str:
+        return f'Path:\t{self.folder_name}\nWith {self.__len__()} profiled files'
+
+    def group_profiles(self, **pivot_kwargs) -> DataFrame:
+        df = DataFrame()
+        for file_path in self.all_files:
+            sub_df = read_csv(file_path)
+            df = df.append(sub_df, ignore_index=True)
+        df = df.pivot_table(**pivot_kwargs).join(df.set_index(pivot_kwargs['index']), lsuffix='_agg')
+        df = df.reset_index().pivot_table(index=[pivot_kwargs['index']]+['cluster_agg'], aggfunc='sum')
+        return df
+
+    def full_pipeline(self, cluster_kwargs={}, **pivot_kwargs) -> DataFrame:
+        df = self.group_profiles(**pivot_kwargs)
+        pipe_obj = Pipeline(steps=[
+            ('pre_scaler', MinMaxScaler()), 
+            ('cluster', PCA(3)),
+            ('pos_scaler', MinMaxScaler()),
+        ])
+        X = pipe_obj.fit_transform(df)
+        df = df.iloc[:,:0].join(DataFrame(X, index=df.index))#.reset_index().set_index(kwargs['index'])
+        df['cluster'], _ = make_clusters(df, df.columns, **cluster_kwargs)
+        df.to_csv(self.base_dir.joinpath('grouped_3D.csv'))
         return df, pipe_obj
