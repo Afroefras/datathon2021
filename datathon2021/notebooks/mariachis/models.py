@@ -171,7 +171,7 @@ class Weather(BaseClass):
 
 ###############################################################################################################
 
-class GroupProfiles:
+class GroupProfiles(BaseClass):
     def __init__(self, base_dir, folder_name) -> None:
         self.base_dir = Path(base_dir)
         self.folder_name = self.base_dir.joinpath(folder_name)
@@ -200,7 +200,6 @@ class GroupProfiles:
             ('pos_scaler', MinMaxScaler()),
         ])
         X = pipe_obj.fit_transform(df)
-        df = df.iloc[:,:0].join(DataFrame(X, index=df.index))#.reset_index().set_index(kwargs['index'])
+        df = df.iloc[:,:0].join(DataFrame(X, index=df.index))
         df['cluster'], _ = make_clusters(df, df.columns, **cluster_kwargs)
-        df.to_csv(self.base_dir.joinpath('grouped_3D.csv'))
         return df, pipe_obj
