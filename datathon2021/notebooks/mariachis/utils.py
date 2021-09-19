@@ -14,7 +14,7 @@ def date_vars(df, date_col:str) -> DataFrame:
 from pandas import read_csv
 from geopandas import GeoDataFrame, points_from_xy
 
-def create_polygon(filepath, dissolve_by=None, crs_code="EPSG:3395", lat_col='lat', lng_col='lng', just_geodf=False) -> DataFrame:
+def create_polygon(filepath:str, dissolve_by=None, crs_code="EPSG:3395", lat_col='lat', lng_col='lng', just_geodf=False) -> DataFrame:
         df = read_csv(filepath)
         gdf = GeoDataFrame(df, crs=crs_code, geometry=points_from_xy(df[lat_col], df[lng_col]))
         if just_geodf: return gdf
@@ -25,13 +25,14 @@ def create_polygon(filepath, dissolve_by=None, crs_code="EPSG:3395", lat_col='la
 
 ###############################################################################################################
 
+from pandas import Series
 from string import ascii_uppercase
 from sklearn.cluster import KMeans
 from sklearn.pipeline import Pipeline
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import RobustScaler
 
-def make_clusters(df, cluster_cols, n_clusters=5, kmeans=False):
+def make_clusters(df, cluster_cols:list, n_clusters=5, kmeans=False) -> tuple([Series,Pipeline]):
     scaler_obj = RobustScaler()
     cluster_obj = KMeans(n_clusters, random_state=22) if kmeans else GaussianMixture(n_clusters, random_state=22)
     pipe_obj = Pipeline(steps=[('scaler', scaler_obj), ('cluster', cluster_obj)])
@@ -57,8 +58,8 @@ from re import sub, UNICODE
 from unicodedata import normalize
 from nltk.corpus import stopwords
 
-def clean_text(text, language='spanish', pattern="[^a-zA-Z0-9\s]", add_stopw=[],
-                lower=False, rem_stopw=False, unique=False, emoji=False):
+def clean_text(text:str, language='spanish', pattern="[^a-zA-Z0-9\s]", add_stopw=[],
+                lower=False, rem_stopw=False, unique=False, emoji=False) -> str:
     if emoji: text = demojize(text)
     cleaned_text = normalize('NFD',str(text).replace('\n',' \n ')).encode('ascii', 'ignore')
     cleaned_text = sub(pattern,' ',cleaned_text.decode('utf-8'),flags=UNICODE)
